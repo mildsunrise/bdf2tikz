@@ -23,6 +23,8 @@ Supports:
  - Text comments
  - Rotated / mirrored symbols / pins
 
+Pin location annotations are ignored.
+
 ## Install
 
 TODO

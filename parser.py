@@ -8,6 +8,8 @@ class ParseError(Exception):
   def __init__(self, reason):
     Exception.__init__(self, u"Malformed BDF file: %s" % (reason,))
 
+SUPPORTED_VERSIONS = [u"1.3", u"1.4"]
+
 def parse_bdf(input):
   # Decode in ASCII (FIXME)
   try:
@@ -18,11 +20,17 @@ def parse_bdf(input):
   # Remove starting comments, if present
   while True:
     input = input.lstrip()
-    if not input.startswith(u"/*"): break
-    input = input[2:]
-    idx = input.find(u"*/")
-    if idx == -1: raise ParseError(u"Unterminated comment")
-    input = input[idx+2:]
+    if input.startswith(u"/*"):
+      input = input[2:]
+      idx = input.find(u"*/")
+      if idx == -1: raise ParseError(u"Unterminated comment")
+      input = input[idx+2:]
+    elif input.startswith(u"//"):
+      input = input[2:]
+      idx = input.find(u"\n")
+      if idx == -1: idx = len(input)
+      input = input[idx+1:]
+    else: break
 
   # Parse S-expressions, validate and strip header
   parsed = ZeroOrMore(sexp).parseString(input, parseAll=True).asList()
@@ -36,7 +44,8 @@ def validate_header(parsed):
   header = parsed.pop(0)[1:]
   if len(header) != 2 or header[0] != u"graphic" or header[1][0] != u"version":
     raise ParseError(u"Not a BDF file, or unparseable header")
-  if header[1] != [u"version", u"1.4"]:
+  version_info = header[1]
+  if len(version_info) != 2 or version_info[1] not in SUPPORTED_VERSIONS:
     raise ParseError(u"Invalid version info: %s" % (header[1],))
 
 def interpret_bdf(parsed):
@@ -78,6 +87,12 @@ class Drawing:
     objects = map(parse_object, object)
     for o in objects: assert isinstance(o, GraphicObject)
     return Drawing(objects)
+
+class AnnotationBlock:
+  name = u"annotation_block"
+  @staticmethod
+  def parse(object):
+    return AnnotationBlock() # TODO: parse those, use in Pin
 
 # Basic objects
 
@@ -245,6 +260,7 @@ class Pin(SchematicObject):
       Bounds: (1,1),
       Point: (1,1),
       Drawing: (1,1),
+      AnnotationBlock: (0,),
       unicode: (0,),
     })
     level = o[Text][2] if len(o[Text]) > 2 else None
@@ -325,25 +341,33 @@ class Arc(GraphicObject):
 
 class Rectangle(GraphicObject):
   name = u"rectangle"
-  def __init__(self, bounds):
+  def __init__(self, bounds, line_width):
     self.bounds = bounds
+    self.line_width = line_width
   @staticmethod
-  def parse(object): # FIXME: migrate
-    assert len(object) == 1
-    object = map(parse_object, object)
-    assert isinstance(object[0], Bounds)
-    return Rectangle(*object)
+  def parse(object):
+    o = parse_grouped(object, {
+      Bounds: (1,1),
+      LineWidth: (0,1),
+    })
+    line_width = None
+    if len(o[LineWidth]): line_width = o[LineWidth][0].width
+    return Rectangle(o[Bounds][0], line_width)
 
 class Circle(GraphicObject):
   name = u"circle"
-  def __init__(self, bounds):
+  def __init__(self, bounds, line_width):
     self.bounds = bounds
+    self.line_width = line_width
   @staticmethod
-  def parse(object): # FIXME: migrate
-    assert len(object) == 1
-    object = map(parse_object, object)
-    assert isinstance(object[0], Bounds)
-    return Circle(*object)
+  def parse(object):
+    o = parse_grouped(object, {
+      Bounds: (1,1),
+      LineWidth: (0,1),
+    })
+    line_width = None
+    if len(o[LineWidth]): line_width = o[LineWidth][0].width
+    return Circle(o[Bounds][0], line_width)
 
 # Generic parsing
 
