@@ -1,4 +1,5 @@
 import math
+import pyparsing
 import parser
 
 class RenderError(Exception):
@@ -44,11 +45,6 @@ def render_tikz_text(text, options):
 # GRAPHIC SHAPES
 # Renders one TikZ statement for a passed graphic shape
 
-#TODO: remove
-def draw_test_point(point, options):
-  if isinstance(point, parser.Point): point = (point.x, point.y)
-  return "  \\filldraw[gray] %s circle [radius=2pt];\n" % render_tikz_point(point, options)
-
 def render_text(object, options):
   bounds = object.bounds
   bold = object.font.bold
@@ -57,12 +53,11 @@ def render_text(object, options):
   vertical = object.vertical
   # FIXME: perform correction, we shouldn't pick center exactly
   # FIXME: allow anchor to be chosen from options
-  # FIXME: obey vertical
 
+  arguments = []
   if vertical: arguments.append("rotate=-90")
   if bold: text = "\\textsf{%s}" % text
   center = ((bounds.x1+bounds.x2) / 2.0, (bounds.y1+bounds.y2) / 2.0)
-  arguments = []
   contents = "%s node[%s] {%s}" % (render_tikz_point(center, options), ", ".join(arguments), text)
   return render_tikz_statement([], contents, options)
 
@@ -75,7 +70,7 @@ def render_graphic_object(object, options):
     p1, p2 = object.p1, object.p2
     contents = "%s -- %s" % (render_tikz_point((p1.x, p1.y), options), render_tikz_point((p2.x, p2.y), options))
     arguments = []
-    # TODO: line_width
+    # FIXME: line_width
     return render_tikz_statement(arguments, contents, options)
 
   if isinstance(object, parser.Arc):
@@ -103,7 +98,7 @@ def render_graphic_object(object, options):
       angle1, angle2, \
     )
     arguments = []
-    # TODO: line_width
+    # FIXME: line_width
     return render_tikz_statement(arguments, contents, options)
 
   if isinstance(object, parser.Rectangle):
@@ -112,7 +107,7 @@ def render_graphic_object(object, options):
     end = (bounds.x2, bounds.y2)
     contents = "%s rectangle %s" % (render_tikz_point(start, options), render_tikz_point(end, options))
     arguments = []
-    # TODO: line_width
+    # FIXME: line_width
     return render_tikz_statement(arguments, contents, options)
 
   if isinstance(object, parser.Circle):
@@ -125,7 +120,7 @@ def render_graphic_object(object, options):
       render_tikz_length(radius[1], options), \
     )
     arguments = []
-    # TODO: line_width
+    # FIXME: line_width
     return render_tikz_statement(arguments, contents, options)
 
 # SCHEMATIC SHAPES
@@ -159,9 +154,9 @@ def get_type_width(parsed_name):
 def render_node_name(name, options):
   def render_component(component):
     name, subscript = component
-    output = render_tikz_text(name, options)
+    output = "\\text{%s}" % render_tikz_text(name, options)
     if subscript:
-      output += "..".join(subscript)
+      output += "_{%s}" % "..".join(map(str, subscript))
     return output
   return "$%s$" % " ".join(map(render_component, parse_node_name(name)))
 
@@ -184,8 +179,8 @@ def render_all_lines(lines, options):
       sides.remove(point)
       neighbors.append(iter(sides).next())
       if line[2] and run[1][0] and line[2] != run[1][0]:
-        print "WARNING: widths inconsistent on point %s" % point
-      else:
+        print "WARNING: widths inconsistent on point %s" % str(point)
+      if run[1][0] is None:
         run[1][0] = line[2]
       return False
     lines[:] = [line for line in lines if process(line)]
@@ -260,28 +255,31 @@ def render_pin(lines, pin, options):
   arguments = ["pin name"]
   statements.append(render_tikz_statement(arguments, contents, noptions))
 
+  # TODO: draw bounds
+
   return "".join(statements)
 
 # Symbol rendering
 
-def should_render_type(symbol):
-  # Try to detect if symbol should be explicitely shown
-  if symbol.typeText.bounds.x1 != 1 or symbol.typeText.bounds.y1 != 0:
-    return True
+def is_primitive(symbol):
+  # Try to detect if symbol is primitive
+  #if symbol.typeText.bounds.x1 != 1 or symbol.typeText.bounds.y1 != 0:
+  #  return False
   if len(symbol.drawing) == 1 and isinstance(symbol.drawing[0], parser.Rectangle):
-    return True
+    return False
   for port in symbol.ports:
-    if not (port.text1.invisible and port.text2.invisible): return True
-  return False
+    if not (port.text1.invisible and port.text2.invisible):
+      return False
+  return True
 
 def render_symbol(lines, symbol, options):
   statements = []
   noptions = dict(options)
   noptions["offset"] = (noptions["offset"][0] + symbol.bounds.x1, noptions["offset"][1] + symbol.bounds.y1)
+  primitive = is_primitive(symbol)
 
   # Draw symbol type
-  render_type = should_render_type(symbol)
-  if render_type and not symbol.typeText.invisible:
+  if (not primitive or symbol.typeText.text in ["VCC"]) and not symbol.typeText.invisible:
     noptions["extra_args"] = options["extra_args"] + ["symbol type"]
     statements += [render_text(symbol.typeText, noptions)]
 
@@ -292,20 +290,22 @@ def render_symbol(lines, symbol, options):
   # Process ports
   for port in symbol.ports:
     if port.text1.text != port.text2.text:
-      print "WARNING: port on symbol %s has different texts: \"%s\" and \"%s\". picking the first name" % (symbol.name.text, port.text1.text, port.text2.text)
+      print "WARNING: port on symbol %s has different texts: \"%s\" and \"%s\". picking the last one" % (symbol.name.text, port.text1.text, port.text2.text)
     
-    if not port.text1.invisible:
+    if not port.text2.invisible:
       noptions["extra_args"] = options["extra_args"] + ["port name"]
       noptions["text_transform"] = lambda x: render_node_name(x, options)
-      statements += [render_text(port.text1, noptions)]
+      statements += [render_text(port.text2, noptions)]
 
     # FIXME: draw arrows!
-    if port.p != port.line.p1 and port.p != port.line.p2:
+    if (port.p.x != port.line.p1.x or port.p.y != port.line.p1.y) and (port.p.x != port.line.p2.x or port.p.y != port.line.p2.y):
       print "WARNING: port line does not match port connection point"
     p1 = (port.line.p1.x + symbol.bounds.x1, port.line.p1.y + symbol.bounds.y1) 
     p2 = (port.line.p2.x + symbol.bounds.x1, port.line.p2.y + symbol.bounds.y1)
-    width = get_type_width(parse_node_name(port.text1.text))
+    width = get_type_width(parse_node_name(port.text2.text)) if not primitive else None
     lines.append((p1, p2, width))
+
+  # TODO: draw bounds
 
   return "".join(statements)
 
@@ -317,7 +317,10 @@ def render_connector(lines, connector, options):
   width = None
   if connector.label:
     name = connector.label.text
-    width = get_type_width(parse_node_name(name))
+    try:
+      width = get_type_width(parse_node_name(name))
+    except pyparsing.ParseException, e:
+      print "WARNING: Couldn't parse \"%s\", ignoring" % name
   lines.append((p1, p2, width))
   # FIXME: it'd be nice to verify, at the end, that bus matched run width
 
@@ -326,7 +329,10 @@ def render_connector(lines, connector, options):
     noptions["extra_args"] = options["extra_args"] + ["line name"]
     noptions["text_transform"] = lambda x: render_node_name(x, options)
     # FIXME: pick suitable anchor depending on line position
-    return render_text(connector.label, noptions)
+    try:
+      return render_text(connector.label, noptions)
+    except pyparsing.ParseException, e:
+      print "WARNING: Couldn't parse \"%s\", ignoring" % name
 
 def render_junction(junction, options):
   p = (junction.p.x, junction.p.y)
