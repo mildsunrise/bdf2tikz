@@ -57,11 +57,11 @@ def render_graphic_object(object, options):
     text = render_tikz_text(object.text, options)
     vertical = object.vertical
 
-    arguments = []
     if vertical: arguments.append("rotate=-90")
     if bold: text = "\textsf{%s}" % text
     center = ((bounds.x1+bounds.x2) / 2.0, (bounds.y1+bounds.y2) / 2.0)
     contents = "%s node[%s] {%s}" % (render_tikz_point(center, options), ", ".join(arguments), text)
+    arguments = []
     return render_tikz_statement([], contents, options)
 
   if isinstance(object, parser.Line):
@@ -124,6 +124,150 @@ def render_graphic_object(object, options):
 # SCHEMATIC SHAPES
 # Renders TikZ statements for a passed schematic object
 # Highest level possible, prints warnings etc.
+# TODO: support transformations
+
+# Parsing and formatting node names
+
+def _prepare_node_name_parser():
+  from pyparsing import Suppress, Regex, OneOrMore, Optional, Group
+  decimal = Regex("\d+").setParseAction(lambda t: int(t[0]))
+  subscript_contents = decimal + Optional(Suppress("..") + decimal)
+  subscript = Group(Suppress("[") + subscript_contents + Suppress("]")).setParseAction(lambda x: tuple(x[0]))
+  component_name = Regex("\w+")
+  component = Group(component_name + Optional(subscript)) \
+    .setParseAction(lambda x: (x[0][0], x[0][1] if len(x[0]) > 1 else None))
+  return OneOrMore(component)
+
+node_name_parser = _prepare_node_name_parser()
+
+def parse_node_name(name):
+  """ Parse name in Quartus notation, returning a list of (name, subscript) tuples,
+      where subscript is either None (no subscript found), or a (start[, end]) tuple. """
+  return node_name_parser.parseString(name, parseAll=True).asList()
+
+def get_type_width(parsed_name):
+  get_component_width = lambda x: abs(x[1][0]-x[1][1])+1 if x[1] and len(x[1]) > 1 else 1
+  return sum(map(get_component_width, parsed_name))
+
+# Line rendering
+
+def render_all_lines(lines, options):
+  # It's important to draw series of connectors "in a single run",
+  # rather than many segments, so group them in runs, where each
+  # run is a (point list, width) tuple
+  runs = []
+
+  def process_end(run):
+    point = run[0][-1]
+    neighbors = []
+
+    def process(line):
+      sides = {line[0], line[1]}
+      if point not in sides: return True
+
+      sides.remove(point)
+      neighbors.append(sides[0])
+      if line[2] and run[1][0] and line[2] != run[1][0]:
+        print "WARNING: widths inconsistent on point %s" % point
+      else:
+        run[1] = line[2]
+      return False
+    lines[:] = [line for line in lines if process(line)]
+
+    if len(neighbors) == 1:
+      run[0].append(neighbors[0])
+      return process_point(run)
+    for neighbor in neighbors:
+      start_run(point, neighbor, run[1])
+
+  def start_run(start, to, width):
+    run = ([start, to], width)
+    runs.append(run)
+    process_point(run)
+    return run
+
+  while len(lines):
+    line = lines.pop()
+    run = start_run(line[0], line[1], (line[2],))
+    run[0].reverse()
+    process_point(run)
+
+  return "".join(map(lambda x: render_line_run(x,options), runs))
+
+def render_line_run(run, options):
+  points, width = run
+  width = width[0]
+  if width is None:
+    print "WARNING: No known type for %s run, defaulting to node" % points[0]
+    width = 1
+  assert len(points) >= 2 and width >= 1
+  contents = " -- ".join(map(lambda x: render_tikz_point(x, options), points))
+  arguments = [("node" if width == 1 else "bus") + " line"]
+  return render_tikz_statement(arguments, contents, options)
+
+# Pin rendering
+
+def render_pin(lines, pin, output):
+  name = pin.name.text
+  if pin.direction == "output":
+    connection = (52,8)
+    text_point = (82,8)
+    text_anchor = "west"
+    drawing = [(52,4), (78,4), (82,8), (78,12), (52,12)]
+  elif pin.direction == "input":
+    connection = (121,8)
+    text_point = (92,8)
+    text_anchor = "east"
+    drawing = [(92,12), (117,12), (121,8), (117,4), (92,4)]
+  else:
+    print "WARNING: don't know how to render %s pin drawing" % pin.direction
+    return None
+
+  noptions = dict(options)
+  noptions["offset"] = (options["offset"][0] + pin.bounds.x1, options["offset"][1] + pin.bounds.y1)
+  statements = []
+
+  connection = (connection[0] + pin.bounds.x1, connection[1] + pin.bounds.y1)
+  width = get_type_width(parse_node_name(name))
+  lines.append((connection, (pin.p.x, pin.p.y), width))
+
+  contents = " -- ".join(map(lambda x: render_tikz_point(x, noptions), drawing)) + " cycle"
+  arguments = [pin.direction + " pin"]
+  statements.append(render_tikz_statement(arguments, contents, noptions))
+
+  contents = "%s node[anchor=%s] {%s}" % ( \
+    render_tikz_point(text_point, noptions), \
+    text_anchor, \
+    render_node_name(name, noptions), \
+  )
+  arguments = ["pin text"]
+  statements.append(render_tikz_statement(arguments, contents, noptions))
+
+  return "".join(statements)
+
+# Symbol rendering
+
+def render_symbol(lines, symbol, options):
+  pass
+
+# Little things: connectors, junctions, drawings
 
 def render_drawing(objects, options):
-  pass
+  output = str()
+  for o in objects:
+    if o.invisible: continue
+    output += render_graphic_object(o, options)
+  return output
+
+def add_connector(lines, connector, options):
+  p1 = (connector.p1.x, connector.p1.y)
+  p2 = (connector.p2.x, connector.p2.y)
+  lines.append((p1, p2, None))
+  # FIXME: it'd be nice to verify, at the end, that bus matched width
+
+def render_junction(junction, options):
+  p = (junction.p.x, junction.p.y)
+  contents = "%s node[contact] {}" % (render_tikz_point(p, options),)
+  arguments = ["junction"]
+  return render_tikz_statement(arguments, contents, options)
+
