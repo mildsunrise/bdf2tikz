@@ -158,8 +158,8 @@ DIRECTIONS = [u"output", u"input", u"bidir"] # FIXME: verify bidir
 
 class Port:
   name = u"port"
-  def __init__(self, point, direction, text1, text2, line):
-    self.point = point
+  def __init__(self, p, direction, text1, text2, line):
+    self.p = p
     self.direction = direction
     self.text1 = text1
     self.text2 = text2

@@ -49,20 +49,27 @@ def draw_test_point(point, options):
   if isinstance(point, parser.Point): point = (point.x, point.y)
   return "  \\filldraw[gray] %s circle [radius=2pt];\n" % render_tikz_point(point, options)
 
+def render_text(object, options):
+  bounds = object.bounds
+  bold = object.font.bold
+  text_transform = options["text_transform"] if "text_transform" in options else lambda x: render_tikz_text(x, options)
+  text = text_transform(object.text)
+  vertical = object.vertical
+  # FIXME: perform correction, we shouldn't pick center exactly
+  # FIXME: allow anchor to be chosen from options
+  # FIXME: obey vertical
+
+  if vertical: arguments.append("rotate=-90")
+  if bold: text = "\\textsf{%s}" % text
+  center = ((bounds.x1+bounds.x2) / 2.0, (bounds.y1+bounds.y2) / 2.0)
+  arguments = []
+  contents = "%s node[%s] {%s}" % (render_tikz_point(center, options), ", ".join(arguments), text)
+  return render_tikz_statement([], contents, options)
+
 def render_graphic_object(object, options):
 
   if isinstance(object, parser.Text):
-    bounds = object.bounds
-    bold = object.font.bold
-    text = render_tikz_text(object.text, options)
-    vertical = object.vertical
-
-    if vertical: arguments.append("rotate=-90")
-    if bold: text = "\textsf{%s}" % text
-    center = ((bounds.x1+bounds.x2) / 2.0, (bounds.y1+bounds.y2) / 2.0)
-    arguments = []
-    contents = "%s node[%s] {%s}" % (render_tikz_point(center, options), ", ".join(arguments), text)
-    return render_tikz_statement([], contents, options)
+    return render_text(object)
 
   if isinstance(object, parser.Line):
     p1, p2 = object.p1, object.p2
@@ -156,7 +163,7 @@ def render_node_name(name, options):
     if subscript:
       output += "..".join(subscript)
     return output
-  return " ".join(map(render_component, parse_node_name(name)))
+  return "$%s$" % " ".join(map(render_component, parse_node_name(name)))
 
 # Line rendering
 
@@ -237,8 +244,9 @@ def render_pin(lines, pin, options):
   statements = []
 
   connection = (connection[0] + pin.bounds.x1, connection[1] + pin.bounds.y1)
+  entry = (pin.p.x + pin.bounds.x1, pin.p.y + pin.bounds.y1)
   width = get_type_width(parse_node_name(name))
-  lines.append((connection, (pin.p.x, pin.p.y), width))
+  lines.append((connection, entry, width))
 
   contents = " -- ".join(map(lambda x: render_tikz_point(x, noptions), drawing) + ["cycle"])
   arguments = [pin.direction + " pin"]
@@ -249,28 +257,76 @@ def render_pin(lines, pin, options):
     text_anchor, \
     render_node_name(name, noptions), \
   )
-  arguments = ["pin text"]
+  arguments = ["pin name"]
   statements.append(render_tikz_statement(arguments, contents, noptions))
 
   return "".join(statements)
 
 # Symbol rendering
 
+def should_render_type(symbol):
+  # Try to detect if symbol should be explicitely shown
+  if symbol.typeText.bounds.x1 != 1 or symbol.typeText.bounds.y1 != 0:
+    return True
+  if len(symbol.drawing) == 1 and isinstance(symbol.drawing[0], parser.Rectangle):
+    return True
+  for port in symbol.ports:
+    if not (port.text1.invisible and port.text2.invisible): return True
+  return False
+
 def render_symbol(lines, symbol, options):
   statements = []
+  noptions = dict(options)
+  noptions["offset"] = (noptions["offset"][0] + symbol.bounds.x1, noptions["offset"][1] + symbol.bounds.y1)
+
+  # Draw symbol type
+  render_type = should_render_type(symbol)
+  if render_type and not symbol.typeText.invisible:
+    noptions["extra_args"] = options["extra_args"] + ["symbol type"]
+    statements += [render_text(symbol.typeText, noptions)]
+
+  # Drawing itself
+  noptions["extra_args"] = options["extra_args"] + ["symbol"]
+  statements += [render_graphic_object(o, noptions) for o in symbol.drawing if not (hasattr(o, "invisible") and o.invisible)]
+
+  # Process ports
+  for port in symbol.ports:
+    if port.text1.text != port.text2.text:
+      print "WARNING: port on symbol %s has different texts: \"%s\" and \"%s\". picking the first name" % (symbol.name.text, port.text1.text, port.text2.text)
+    
+    if not port.text1.invisible:
+      noptions["extra_args"] = options["extra_args"] + ["port name"]
+      noptions["text_transform"] = lambda x: render_node_name(x, options)
+      statements += [render_text(port.text1, noptions)]
+
+    # FIXME: draw arrows!
+    if port.p != port.line.p1 and port.p != port.line.p2:
+      print "WARNING: port line does not match port connection point"
+    p1 = (port.line.p1.x + symbol.bounds.x1, port.line.p1.y + symbol.bounds.y1) 
+    p2 = (port.line.p2.x + symbol.bounds.x1, port.line.p2.y + symbol.bounds.y1)
+    width = get_type_width(parse_node_name(port.text1.text))
+    lines.append((p1, p2, width))
+
   return "".join(statements)
 
-# Little things: connectors, junctions, drawings
+# Little things: connectors, junctions...
 
-def render_drawing(objects, options):
-  statements = [render_graphic_object(o, options) for o in objects if not o.invisible]
-  return "".join(statements)
-
-def add_connector(lines, connector, options):
+def render_connector(lines, connector, options):
   p1 = (connector.p1.x, connector.p1.y)
   p2 = (connector.p2.x, connector.p2.y)
-  lines.append((p1, p2, None))
-  # FIXME: it'd be nice to verify, at the end, that bus matched width
+  width = None
+  if connector.label:
+    name = connector.label.text
+    width = get_type_width(parse_node_name(name))
+  lines.append((p1, p2, width))
+  # FIXME: it'd be nice to verify, at the end, that bus matched run width
+
+  if connector.label:
+    noptions = dict(options)
+    noptions["extra_args"] = options["extra_args"] + ["line name"]
+    noptions["text_transform"] = lambda x: render_node_name(x, options)
+    # FIXME: pick suitable anchor depending on line position
+    return render_text(connector.label, noptions)
 
 def render_junction(junction, options):
   p = (junction.p.x, junction.p.y)
