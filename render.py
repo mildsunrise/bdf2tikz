@@ -60,8 +60,8 @@ def render_graphic_object(object, options):
     if vertical: arguments.append("rotate=-90")
     if bold: text = "\textsf{%s}" % text
     center = ((bounds.x1+bounds.x2) / 2.0, (bounds.y1+bounds.y2) / 2.0)
-    contents = "%s node[%s] {%s}" % (render_tikz_point(center, options), ", ".join(arguments), text)
     arguments = []
+    contents = "%s node[%s] {%s}" % (render_tikz_point(center, options), ", ".join(arguments), text)
     return render_tikz_statement([], contents, options)
 
   if isinstance(object, parser.Line):
@@ -149,6 +149,15 @@ def get_type_width(parsed_name):
   get_component_width = lambda x: abs(x[1][0]-x[1][1])+1 if x[1] and len(x[1]) > 1 else 1
   return sum(map(get_component_width, parsed_name))
 
+def render_node_name(name, options):
+  def render_component(component):
+    name, subscript = component
+    output = render_tikz_text(name, options)
+    if subscript:
+      output += "..".join(subscript)
+    return output
+  return " ".join(map(render_component, parse_node_name(name)))
+
 # Line rendering
 
 def render_all_lines(lines, options):
@@ -166,31 +175,31 @@ def render_all_lines(lines, options):
       if point not in sides: return True
 
       sides.remove(point)
-      neighbors.append(sides[0])
+      neighbors.append(iter(sides).next())
       if line[2] and run[1][0] and line[2] != run[1][0]:
         print "WARNING: widths inconsistent on point %s" % point
       else:
-        run[1] = line[2]
+        run[1][0] = line[2]
       return False
     lines[:] = [line for line in lines if process(line)]
 
     if len(neighbors) == 1:
       run[0].append(neighbors[0])
-      return process_point(run)
+      return process_end(run)
     for neighbor in neighbors:
       start_run(point, neighbor, run[1])
 
   def start_run(start, to, width):
     run = ([start, to], width)
     runs.append(run)
-    process_point(run)
+    process_end(run)
     return run
 
   while len(lines):
     line = lines.pop()
-    run = start_run(line[0], line[1], (line[2],))
+    run = start_run(line[0], line[1], [line[2]])
     run[0].reverse()
-    process_point(run)
+    process_end(run)
 
   return "".join(map(lambda x: render_line_run(x,options), runs))
 
@@ -198,7 +207,7 @@ def render_line_run(run, options):
   points, width = run
   width = width[0]
   if width is None:
-    print "WARNING: No known type for %s run, defaulting to node" % points[0]
+    print "WARNING: No known type for %s run, defaulting to node" % str(points[0])
     width = 1
   assert len(points) >= 2 and width >= 1
   contents = " -- ".join(map(lambda x: render_tikz_point(x, options), points))
@@ -207,7 +216,7 @@ def render_line_run(run, options):
 
 # Pin rendering
 
-def render_pin(lines, pin, output):
+def render_pin(lines, pin, options):
   name = pin.name.text
   if pin.direction == "output":
     connection = (52,8)
@@ -231,7 +240,7 @@ def render_pin(lines, pin, output):
   width = get_type_width(parse_node_name(name))
   lines.append((connection, (pin.p.x, pin.p.y), width))
 
-  contents = " -- ".join(map(lambda x: render_tikz_point(x, noptions), drawing)) + " cycle"
+  contents = " -- ".join(map(lambda x: render_tikz_point(x, noptions), drawing) + ["cycle"])
   arguments = [pin.direction + " pin"]
   statements.append(render_tikz_statement(arguments, contents, noptions))
 
@@ -248,16 +257,14 @@ def render_pin(lines, pin, output):
 # Symbol rendering
 
 def render_symbol(lines, symbol, options):
-  pass
+  statements = []
+  return "".join(statements)
 
 # Little things: connectors, junctions, drawings
 
 def render_drawing(objects, options):
-  output = str()
-  for o in objects:
-    if o.invisible: continue
-    output += render_graphic_object(o, options)
-  return output
+  statements = [render_graphic_object(o, options) for o in objects if not o.invisible]
+  return "".join(statements)
 
 def add_connector(lines, connector, options):
   p1 = (connector.p1.x, connector.p1.y)

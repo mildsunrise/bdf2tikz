@@ -185,8 +185,8 @@ class SchematicObject(object):
 
 class Junction(SchematicObject):
   name = u"junction"
-  def __init__(self, point):
-    self.point = point
+  def __init__(self, p):
+    self.p = p
   @staticmethod
   def parse(object):
     assert len(object) == 1
