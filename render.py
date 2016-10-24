@@ -284,7 +284,8 @@ def render_pin(lines, pin, options):
 
   # Draw bounds
   contents = "%s rectangle %s" % (render_tikz_point((0,0), noptions), render_tikz_point((pin.bounds.x2 - pin.bounds.x1, pin.bounds.y2 - pin.bounds.y1), noptions))
-  statements += [render_tikz_statement(["pin bounds"], contents, noptions)]
+  if "render_pin_bounds" in options and options["render_pin_bounds"]:
+    statements += [render_tikz_statement(["pin bounds"], contents, noptions)]
 
   # Create connection line
   connection = (connection[0] + pin.bounds.x1, connection[1] + pin.bounds.y1)
