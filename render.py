@@ -197,10 +197,11 @@ def get_type_width(parsed_name):
 def render_node_name(name, options):
   def render_component(component):
     name, subscript = component
-    output = "\\text{%s}" % render_tikz_text(name, options)
-    if subscript:
-      output += "_{%s}" % "..".join(map(str, subscript))
-    return output
+    if subscript and len(subscript) == 1:
+      return "\\nodenamesingle{%s}{%d}" % (render_tikz_text(name, options), subscript[0])
+    if subscript and len(subscript) == 2:
+      return "\\nodenamerange{%s}{%d}{%d}" % (render_tikz_text(name, options), subscript[0], subscript[1])
+    return "\\nodenamebit{%s}" % (render_tikz_text(name, options))
   return "$%s$" % " ".join(map(render_component, parse_node_name(name)))
 
 # Line rendering
