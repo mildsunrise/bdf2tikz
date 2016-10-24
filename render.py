@@ -258,24 +258,29 @@ def render_pin(lines, pin, options):
   noptions["offset"] = (options["offset"][0] + pin.bounds.x1, options["offset"][1] + pin.bounds.y1)
   statements = []
 
+  # Draw bounds
+  contents = "%s rectangle %s" % (render_tikz_point((0,0), noptions), render_tikz_point((pin.bounds.x2 - pin.bounds.x1, pin.bounds.y2 - pin.bounds.y1), noptions))
+  statements += [render_tikz_statement(["pin bounds"], contents, noptions)]
+
+  # Create connection line
   connection = (connection[0] + pin.bounds.x1, connection[1] + pin.bounds.y1)
   entry = (pin.p.x + pin.bounds.x1, pin.p.y + pin.bounds.y1)
   width = get_type_width(parse_node_name(name))
   lines.append((connection, entry, width))
 
+  # Pin drawing itself
   contents = " -- ".join(map(lambda x: render_tikz_point(x, noptions), drawing) + ["cycle"])
   arguments = [pin.direction + " pin"]
-  statements.append(render_tikz_statement(arguments, contents, noptions))
+  statements += [render_tikz_statement(arguments, contents, noptions)]
 
+  # Draw pin name
   contents = "%s node[anchor=%s] {%s}" % ( \
     render_tikz_point(text_point, noptions), \
     text_anchor, \
     render_node_name(name, noptions), \
   )
   arguments = ["pin name"]
-  statements.append(render_tikz_statement(arguments, contents, noptions))
-
-  # TODO: draw bounds
+  statements += [render_tikz_statement(arguments, contents, noptions)]
 
   return "".join(statements)
 
@@ -297,6 +302,10 @@ def render_symbol(lines, symbol, options):
   noptions = dict(options)
   noptions["offset"] = (noptions["offset"][0] + symbol.bounds.x1, noptions["offset"][1] + symbol.bounds.y1)
   primitive = is_primitive(symbol)
+
+  # Draw bounds
+  contents = "%s rectangle %s" % (render_tikz_point((0,0), noptions), render_tikz_point((symbol.bounds.x2 - symbol.bounds.x1, symbol.bounds.y2 - symbol.bounds.y1), noptions))
+  statements += [render_tikz_statement(["symbol bounds"], contents, noptions)]
 
   # Draw symbol type
   if (not primitive or symbol.typeText.text in ["VCC"]) and not symbol.typeText.invisible:
@@ -324,8 +333,6 @@ def render_symbol(lines, symbol, options):
     p2 = (port.line.p2.x + symbol.bounds.x1, port.line.p2.y + symbol.bounds.y1)
     width = get_type_width(parse_node_name(port.text2.text)) if not primitive else None
     lines.append((p1, p2, width))
-
-  # TODO: draw bounds
 
   return "".join(statements)
 
