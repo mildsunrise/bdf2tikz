@@ -88,8 +88,7 @@ def calculate_optimal_anchor_to_line(bounds, vertical, line):
   p1 = (line.p1.x, line.p1.y)
   p2 = (line.p2.x, line.p2.y)
   anchors = TEXT_ANCHORS.keys()
-  anchors.sort(key=lambda anchor: abs(TEXT_ANCHORS[anchor][0]) + abs(TEXT_ANCHORS[anchor][1]))
-  anchors.sort(key=lambda anchor: distance_to_segment(p1, p2, calculate_anchor_point(bounds, vertical, anchor)))
+  anchors.sort(key=lambda anchor: distance_to_segment(p1, p2, calculate_anchor_point(bounds, vertical, anchor)) + 1*(abs(TEXT_ANCHORS[anchor][0]) + abs(TEXT_ANCHORS[anchor][1])))
   return anchors[0]
 
 def render_text(object, options):
