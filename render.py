@@ -45,20 +45,44 @@ def render_tikz_text(text, options):
 # GRAPHIC SHAPES
 # Renders one TikZ statement for a passed graphic shape
 
+TEXT_HPOINTS = {-1: 0, 0: .5, +1: 1}
+TEXT_VPOINTS = {-1: 0, 0: .45, +1: 1}
+
+TEXT_ANCHORS = {
+  "center":     ( 0, 0),
+  "east":       (+1, 0),
+  "south east": (+1,-1),
+  "south":      ( 0,-1),
+  "south west": (-1,-1),
+  "west":       (-1, 0),
+  "north west": (-1,+1),
+  "north":      ( 0,+1),
+  "north east": (+1,+1),
+}
+
+def calculate_anchor_point(bounds, vertical, anchor):
+  def map(x, start, end):
+    #if start > end: start, end = end, start
+    return start + x * (end - start)
+  x, y = TEXT_ANCHORS[anchor]
+  x = TEXT_HPOINTS[x]
+  y = TEXT_VPOINTS[y]
+  if vertical: x, y = y, x
+  return (map(x, bounds.x1, bounds.x2), map(y, bounds.y2, bounds.y1))
+
 def render_text(object, options):
-  bounds = object.bounds
+  anchor = options["text_anchor"] if "text_anchor" in options else "center"
   bold = object.font.bold
   text_transform = options["text_transform"] if "text_transform" in options else lambda x: render_tikz_text(x, options)
   text = text_transform(object.text)
   vertical = object.vertical
-  # FIXME: perform correction, we shouldn't pick center exactly
-  # FIXME: allow anchor to be chosen from options
+  point = calculate_anchor_point(object.bounds, vertical, anchor)
 
   arguments = []
+  if anchor != "center": arguments.append("anchor=" + anchor)
   if vertical: arguments.append("rotate=-90")
   if bold: text = "\\textsf{%s}" % text
-  center = ((bounds.x1+bounds.x2) / 2.0, (bounds.y1+bounds.y2) / 2.0)
-  contents = "%s node[%s] {%s}" % (render_tikz_point(center, options), ", ".join(arguments), text)
+  contents = "%s node[%s] {%s}" % (render_tikz_point(point, options), ", ".join(arguments), text)
   return render_tikz_statement([], contents, options)
 
 def render_graphic_object(object, options):
