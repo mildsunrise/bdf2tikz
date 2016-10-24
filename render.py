@@ -349,6 +349,8 @@ def render_symbol(lines, symbol, options):
     if not port.text2.invisible:
       noptions["extra_args"] = options["extra_args"] + ["port name"]
       noptions["text_transform"] = lambda x: render_node_name(x, options)
+      #FIXME: snap
+      noptions["text_anchor"] = calculate_optimal_anchor_to_line(port.text2.bounds, port.text2.vertical, port.line)
       statements += [render_text(port.text2, noptions)]
 
     # FIXME: draw arrows!
@@ -380,7 +382,7 @@ def render_connector(lines, connector, options):
     noptions = dict(options)
     noptions["extra_args"] = options["extra_args"] + ["line name"]
     noptions["text_transform"] = lambda x: render_node_name(x, options)
-    # FIXME: pick suitable anchor depending on line position
+    noptions["text_anchor"] = calculate_optimal_anchor_to_line(connector.label.bounds, connector.label.vertical, parser.Line(connector.p1, connector.p2, None))
     try:
       return render_text(connector.label, noptions)
     except pyparsing.ParseException, e:
