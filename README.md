@@ -22,8 +22,10 @@ Supports:
  - Junctions
  - Text comments
  - Rotated / mirrored symbols / pins
+ - Ability to render width indicator on bus lines without label
 
-Pin location annotations are ignored.
+Pin location annotations are ignored. Symbol instance names are not
+rendered. Conduit lines and bidirectional pins currencly not supported.
 
 ## Install
 
