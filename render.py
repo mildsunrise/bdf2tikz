@@ -250,7 +250,7 @@ def render_pin(lines, pin, options):
     text_anchor = "west"
     drawing = [(52,4), (78,4), (82,8), (78,12), (52,12)]
   elif pin.direction == "input":
-    connection = (121,8)
+    connection = (120.5,8)
     text_point = (92,8)
     text_anchor = "east"
     drawing = [(92,12), (117,12), (121,8), (117,4), (92,4)]
