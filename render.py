@@ -46,7 +46,7 @@ def render_tikz_text(text, options):
 # Renders one TikZ statement for a passed graphic shape
 
 TEXT_HPOINTS = {-1: 0, 0: .5, +1: 1}
-TEXT_VPOINTS = {-1: 0, 0: .45, +1: 1}
+TEXT_VPOINTS = {-1: 0, 0: .5, +1: 1}
 
 TEXT_ANCHORS = {
   "center":     ( 0, 0),
@@ -67,8 +67,31 @@ def calculate_anchor_point(bounds, vertical, anchor):
   x, y = TEXT_ANCHORS[anchor]
   x = TEXT_HPOINTS[x]
   y = TEXT_VPOINTS[y]
-  if vertical: x, y = y, x
+  if vertical: x, y = 1-y, x
   return (map(x, bounds.x1, bounds.x2), map(y, bounds.y2, bounds.y1))
+
+def calculate_optimal_anchor_to_line(bounds, vertical, line):
+  def distance_to_segment(a, b, x):
+    # vector algebra on the go! :D
+    subtract = lambda a, b: (a[0]-b[0], a[1]-b[1])
+    dot = lambda a, b: a[0]*b[0] + a[1]*b[1]
+    norm = lambda a: math.sqrt(dot(a, a))
+    distance = lambda a, b: norm(subtract(a, b))
+    map = lambda x, start, end: start + x * (end - start)
+
+    l = distance(a, b)
+    if l == 0: return distance(a, x)
+    t = max(0, min(1, dot(subtract(x,a), subtract(b,a)) / l))
+    projection = (map(t, a[0], b[0]), map(t, a[1], b[1]))
+    return distance(x, projection)
+
+  p1 = (line.p1.x, line.p1.y)
+  p2 = (line.p2.x, line.p2.y)
+  # FIXME: prefer centered anchors
+  anchors = TEXT_ANCHORS.keys()
+  anchors.sort(key=lambda anchor: abs(TEXT_ANCHORS[anchor][0]) + abs(TEXT_ANCHORS[anchor][1]))
+  anchors.sort(key=lambda anchor: distance_to_segment(p1, p2, calculate_anchor_point(bounds, vertical, anchor)))
+  return anchors[0]
 
 def render_text(object, options):
   anchor = options["text_anchor"] if "text_anchor" in options else "center"
@@ -80,7 +103,7 @@ def render_text(object, options):
 
   arguments = []
   if anchor != "center": arguments.append("anchor=" + anchor)
-  if vertical: arguments.append("rotate=-90")
+  if vertical: arguments.append("rotate=90")
   if bold: text = "\\textsf{%s}" % text
   contents = "%s node[%s] {%s}" % (render_tikz_point(point, options), ", ".join(arguments), text)
   return render_tikz_statement([], contents, options)
