@@ -94,7 +94,6 @@ def render_graphic_object(object, options):
     p1, p2 = object.p1, object.p2
     contents = "%s -- %s" % (render_tikz_point((p1.x, p1.y), options), render_tikz_point((p2.x, p2.y), options))
     arguments = []
-    # FIXME: line_width
     return render_tikz_statement(arguments, contents, options)
 
   if isinstance(object, parser.Arc):
@@ -122,7 +121,6 @@ def render_graphic_object(object, options):
       angle1, angle2, \
     )
     arguments = []
-    # FIXME: line_width
     return render_tikz_statement(arguments, contents, options)
 
   if isinstance(object, parser.Rectangle):
@@ -131,7 +129,6 @@ def render_graphic_object(object, options):
     end = (bounds.x2, bounds.y2)
     contents = "%s rectangle %s" % (render_tikz_point(start, options), render_tikz_point(end, options))
     arguments = []
-    # FIXME: line_width
     return render_tikz_statement(arguments, contents, options)
 
   if isinstance(object, parser.Circle):
@@ -144,7 +141,6 @@ def render_graphic_object(object, options):
       render_tikz_length(radius[1], options), \
     )
     arguments = []
-    # FIXME: line_width
     return render_tikz_statement(arguments, contents, options)
 
 # SCHEMATIC SHAPES
