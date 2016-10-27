@@ -6,9 +6,12 @@ class RenderError(Exception):
   pass
 
 # Global options passed in a dictionary:
-# offset: (x,y) tuple (in viewport units) that will be added to passed coordinates
-# scale: for what a viewport unit maps to, in TikZ units
-# extra_args: list of strings, extra TikZ options to use in statements
+#
+#     offset: (x,y) tuple (in viewport units) that will be added to passed coordinates
+#     scale: for what a viewport unit maps to, in TikZ units
+#     extra_args: list of strings, extra TikZ options to use in statements
+#     anchor_ports: whether port names should be anchored optimally
+#     anchor_labels: whether connector labels should be anchored optimally
 
 # VERY LOW LEVEL
 # TikZ syntax for coordinates, points...
@@ -347,8 +350,10 @@ def render_symbol(lines, symbol, options):
     if not port.text2.invisible:
       noptions["extra_args"] = options["extra_args"] + ["port name"]
       noptions["text_transform"] = lambda x: render_node_name(x, options)
-      #FIXME: snap
-      noptions["text_anchor"] = calculate_optimal_anchor_to_line(port.text2.bounds, port.text2.vertical, port.line)
+      #FIXME: snap if options and only rectangle
+      noptions["text_anchor"] = "center"
+      if options["anchor_ports"]:
+        noptions["text_anchor"] = calculate_optimal_anchor_to_line(port.text2.bounds, port.text2.vertical, port.line)
       statements += [render_text(port.text2, noptions)]
 
     # FIXME: draw arrows!
@@ -380,7 +385,8 @@ def render_connector(lines, connector, options):
     noptions = dict(options)
     noptions["extra_args"] = options["extra_args"] + ["line name"]
     noptions["text_transform"] = lambda x: render_node_name(x, options)
-    noptions["text_anchor"] = calculate_optimal_anchor_to_line(connector.label.bounds, connector.label.vertical, parser.Line(connector.p1, connector.p2, None))
+    if options["anchor_labels"]:
+      noptions["text_anchor"] = calculate_optimal_anchor_to_line(connector.label.bounds, connector.label.vertical, parser.Line(connector.p1, connector.p2, None))
     try:
       return render_text(connector.label, noptions)
     except pyparsing.ParseException, e:
