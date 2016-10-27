@@ -5,7 +5,13 @@ import pprint
 
 rs = parse_bdf(open(sys.argv[1],"rb").read())
 
-options = {"scale": 1/35., "offset": (0,0), "extra_args": []}
+options = {
+  "scale": 1/42.,
+  "anchor_ports": True, "anchor_labels": True,
+  "render_pin_bounds": False,
+
+  "offset": (0,0), "extra_args": [],
+}
 lines = []
 output = ""
 complementary_output = ""
