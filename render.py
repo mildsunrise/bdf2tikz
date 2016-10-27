@@ -175,10 +175,60 @@ def render_graphic_object(object, options):
     arguments = []
     return render_tikz_statement(arguments, contents, options)
 
+# TRANSFORMS
+# Interpret transform attributes in objects into TikZ arguments,
+# or equivalent matrixes.
+
+ROTATION_MATRIXES = {
+    0: [[ 1, 0],
+        [ 0, 1]],
+   90: [[ 0,-1],
+        [-1, 0]],
+  180: [[ 0,-1],
+        [ 1, 0]],
+  270: [[ 0, 1],
+        [ 1, 0]],
+}
+
+def apply_matrix(matrix, point):
+  x = matrix[0][0] * point[0] + matrix[0][1] * point[1]
+  y = matrix[1][0] * point[0] + matrix[1][1] * point[1]
+  return (x, y)
+
+def get_point_transform(object):
+  bounds = object.bounds
+  matrix = ROTATION_MATRIXES[object.rotation or 0]
+  size = (bounds.x2 - bounds.x1, bounds.y2 - bounds.y1)
+  def transform_point(point):
+    if object.mirror == "x": point = (point[0], size[1]-point[1])
+    if object.mirror == "y": point = (size[0]-point[0], point[1])
+    return apply_matrix(matrix, point)
+  return transform_point
+
+def transform_text_anchor(object, anchor):
+  matrix = get_object_transform_matrix(object)
+  point = TEXT_ANCHORS[anchor]
+  point = apply_matrix(matrix, (point[0], point[1]))
+  return find_anchor((point[0], -point[1]))
+
+def get_object_transform_matrix(object):
+  matrix = ROTATION_MATRIXES[object.rotation or 0]
+  matrix = map(list, matrix) # deep copy
+  if object.mirror == "x":
+    matrix[0][1] *= -1
+    matrix[1][1] *= -1
+  if object.mirror == "y":
+    matrix[0][0] *= -1
+    matrix[1][0] *= -1
+  return matrix
+
+def get_object_transform_arguments(object):
+  #TODO
+  return []
+
 # SCHEMATIC SHAPES
 # Renders TikZ statements for a passed schematic object
 # Highest level possible, prints warnings etc.
-# TODO: support transformations
 
 # Parsing and formatting node names
 
@@ -290,6 +340,13 @@ def render_pin(lines, pin, options):
   noptions = dict(options)
   noptions["offset"] = (options["offset"][0] + pin.bounds.x1, options["offset"][1] + pin.bounds.y1)
   statements = []
+
+  # (apply transform to drawing if needed)
+  transform = get_point_transform(pin)
+  connection = transform(connection)
+  text_point = transform(text_point)
+  drawing = map(transform, drawing)
+  text_anchor = transform_text_anchor(pin, text_anchor)
 
   # Draw bounds
   contents = "%s rectangle %s" % (render_tikz_point((0,0), noptions), render_tikz_point((pin.bounds.x2 - pin.bounds.x1, pin.bounds.y2 - pin.bounds.y1), noptions))
