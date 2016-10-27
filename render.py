@@ -45,8 +45,8 @@ def escape_latex_char(c):
 def render_tikz_text(text, options):
   return "".join(map(escape_latex_char, text))
 
-# GRAPHIC SHAPES
-# Renders one TikZ statement for a passed graphic shape
+# TEXT RENDERING
+# Anchors, calculating optimal anchor points, etc.
 
 TEXT_HPOINTS = {-1: 0, 0: .5, +1: 1}
 TEXT_VPOINTS = {-1: 0, 0: .5, +1: 1}
@@ -62,6 +62,11 @@ TEXT_ANCHORS = {
   "north":      ( 0,+1),
   "north east": (+1,+1),
 }
+
+def find_anchor(point):
+  for a in TEXT_ANCHORS:
+    if TEXT_ANCHORS[a] == point: return a
+  raise Exception("Invalid anchor point %s" % str(point))
 
 def calculate_anchor_point(bounds, vertical, anchor):
   def map(x, start, end):
@@ -108,6 +113,9 @@ def render_text(object, options):
   if bold: text = "\\textsf{%s}" % text
   contents = "%s node[%s] {%s}" % (render_tikz_point(point, options), ", ".join(arguments), text)
   return render_tikz_statement([], contents, options)
+
+# GRAPHIC SHAPES
+# Renders one TikZ statement for a passed graphic shape
 
 def render_graphic_object(object, options):
 
@@ -300,13 +308,16 @@ def render_pin(lines, pin, options):
   statements += [render_tikz_statement(arguments, contents, noptions)]
 
   # Draw pin name
-  contents = "%s node[anchor=%s] {%s}" % ( \
+  arguments = ["anchor=%s" % text_anchor]
+  contents = "%s node[%s] {%s}" % ( \
     render_tikz_point(text_point, noptions), \
-    text_anchor, \
+    ", ".join(arguments), \
     render_node_name(name, noptions), \
   )
   arguments = ["pin name"]
   statements += [render_tikz_statement(arguments, contents, noptions)]
+
+  # FIXME: draw default level
 
   return "".join(statements)
 
