@@ -350,7 +350,7 @@ def render_pin(lines, pin, options):
 
   # Draw bounds
   contents = "%s rectangle %s" % (render_tikz_point((0,0), noptions), render_tikz_point((pin.bounds.x2 - pin.bounds.x1, pin.bounds.y2 - pin.bounds.y1), noptions))
-  if "render_pin_bounds" in options and options["render_pin_bounds"]:
+  if options["render_pin_bounds"]:
     statements += [render_tikz_statement(["pin bounds"], contents, noptions)]
 
   # Create connection line
@@ -399,7 +399,8 @@ def render_symbol(lines, symbol, options):
 
   # Draw bounds
   contents = "%s rectangle %s" % (render_tikz_point((0,0), noptions), render_tikz_point((symbol.bounds.x2 - symbol.bounds.x1, symbol.bounds.y2 - symbol.bounds.y1), noptions))
-  statements += [render_tikz_statement(["symbol bounds"], contents, noptions)]
+  if options["render_symbol_bounds"]:
+    statements += [render_tikz_statement(["symbol bounds"], contents, noptions)]
 
   # Draw symbol type
   if (not primitive or symbol.typeText.text in ["VCC"]) and not symbol.typeText.invisible:
