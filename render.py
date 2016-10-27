@@ -419,9 +419,12 @@ def render_symbol(lines, symbol, options):
     if not port.text2.invisible:
       noptions["extra_args"] = options["extra_args"] + ["port name"]
       noptions["text_transform"] = lambda x: render_node_name(x, options)
-      #FIXME: snap if options and only rectangle
       noptions["text_anchor"] = "center"
-      if options["anchor_ports"]:
+      if options["port_name_t_snap"]:
+        snap_port_tangential(port, options["port_name_t_snap"])
+      if options["port_name_n_snap"]:
+        snap_port_normal(port, options["port_name_n_snap"], noptions)
+      elif options["anchor_ports"]:
         noptions["text_anchor"] = calculate_optimal_anchor_to_line(port.text2.bounds, port.text2.vertical, port.line)
       statements += [render_text(port.text2, noptions)]
 
@@ -434,6 +437,13 @@ def render_symbol(lines, symbol, options):
     lines.append((p1, p2, width))
 
   return "".join(statements)
+
+def snap_port_tangential(port, limit):
+  
+
+def snap_port_distance(port, limit, options):
+  distance = options["port_name_n_distance"]
+  
 
 # Little things: connectors, junctions...
 
