@@ -63,7 +63,14 @@ TEXT_ANCHORS = {
   "north east": (+1,+1),
 }
 
-def find_anchor(point):
+def sig(n):
+  if n > 0: return +1
+  if n < 0: return -1
+  return 0
+
+def find_anchor(point, vertical):
+  point = (sig(point[0]), sig(point[1]))
+  if vertical: point = (-point[1], point[0])
   for a in TEXT_ANCHORS:
     if TEXT_ANCHORS[a] == point: return a
   raise Exception("Invalid anchor point %s" % str(point))
@@ -209,7 +216,7 @@ def transform_text_anchor(object, anchor):
   matrix = get_object_transform_matrix(object)
   point = TEXT_ANCHORS[anchor]
   point = apply_matrix(matrix, (point[0], point[1]))
-  return find_anchor((point[0], -point[1]))
+  return find_anchor((point[0], -point[1]), False)
 
 def get_object_transform_matrix(object):
   matrix = ROTATION_MATRIXES[object.rotation or 0]
@@ -420,10 +427,8 @@ def render_symbol(lines, symbol, options):
       noptions["extra_args"] = options["extra_args"] + ["port name"]
       noptions["text_transform"] = lambda x: render_node_name(x, options)
       noptions["text_anchor"] = "center"
-      if options["port_name_t_snap"]:
-        snap_port_tangential(port, options["port_name_t_snap"])
-      if options["port_name_n_snap"]:
-        snap_port_normal(port, options["port_name_n_snap"], noptions)
+      if snap_port_name(port, noptions):
+        pass
       elif options["anchor_ports"]:
         noptions["text_anchor"] = calculate_optimal_anchor_to_line(port.text2.bounds, port.text2.vertical, port.line)
       statements += [render_text(port.text2, noptions)]
@@ -438,12 +443,49 @@ def render_symbol(lines, symbol, options):
 
   return "".join(statements)
 
-def snap_port_tangential(port, limit):
-  
-
-def snap_port_distance(port, limit, options):
+def snap_port_name(port, options):
   distance = options["port_name_n_distance"]
-  
+  if distance is False or distance is None: return
+  tangential_limit = options["port_name_t_snap"]
+  normal_limit = options["port_name_n_snap"]
+
+  # determine inner point
+  line_points = { (port.line.p1.x, port.line.p1.y), (port.line.p2.x, port.line.p2.y) }
+  line_points.remove((port.p.x, port.p.y))
+  point = iter(line_points).next()
+
+  # line should be horizontal or vertical
+  line_delta = (port.p.x - point[0], port.p.y - point[1])
+  if line_delta[0] and line_delta[1]: return
+  line_vertical = line_delta[0] == 0
+
+  # determine text anchor point
+  if line_vertical == (not port.text2.vertical): return
+  line_anchor = find_anchor(line_delta, line_vertical)
+  text = calculate_anchor_point(port.text2.bounds, line_vertical, line_anchor)
+
+  # determine difference from text to line
+  diff = (text[0] - point[0], text[1] - point[1])
+  if line_vertical: diff = (diff[1], diff[0])
+  if line_delta[0] + line_delta[1] > 0:
+    diff = (-diff[0], diff[1])
+
+  # assert difference is within limits
+  if diff[0] < -3 or diff[0] > normal_limit: return
+  if abs(diff[1]) > tangential_limit: return
+  diff = (distance, 0)
+  options["text_anchor"] = line_anchor
+
+  # correct text bounds
+  if line_delta[0] + line_delta[1] > 0:
+    diff = (-diff[0], diff[1])
+  if line_vertical: diff = (diff[1], diff[0])
+  new_text = (diff[0] + point[0], diff[1] + point[1])
+  port.text2.bounds.x1 += new_text[0] - text[0]
+  port.text2.bounds.x2 += new_text[0] - text[0]
+  port.text2.bounds.y1 += new_text[1] - text[1]
+  port.text2.bounds.y2 += new_text[1] - text[1]
+  return True
 
 # Little things: connectors, junctions...
 
