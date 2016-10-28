@@ -270,7 +270,7 @@ def render_node_name(name, options):
     return "\\nodenamebit{%s}" % (render_tikz_text(name, options))
   return "$%s$" % " ".join(map(render_component, parse_node_name(name)))
 
-# Line rendering
+# Line rendering (lines is a list of (p1, p2, width, arrow))
 
 def render_all_lines(lines, options):
   # It's important to draw series of connectors "in a single run",
@@ -364,7 +364,7 @@ def render_pin(lines, pin, options):
   connection = (connection[0] + pin.bounds.x1, connection[1] + pin.bounds.y1)
   entry = (pin.p.x + pin.bounds.x1, pin.p.y + pin.bounds.y1)
   width = get_type_width(parse_node_name(name))
-  lines.append((connection, entry, width))
+  lines.append((connection, entry, width, False))
 
   # Pin drawing itself
   contents = " -- ".join(map(lambda x: render_tikz_point(x, noptions), drawing) + ["cycle"])
@@ -434,12 +434,14 @@ def render_symbol(lines, symbol, options):
       statements += [render_text(port.text2, noptions)]
 
     # FIXME: draw arrows!
-    if (port.p.x != port.line.p1.x or port.p.y != port.line.p1.y) and (port.p.x != port.line.p2.x or port.p.y != port.line.p2.y):
-      print "WARNING: port line does not match port connection point"
+    p = (port.p.x + symbol.bounds.x1, port.p.y + symbol.bounds.y1)
     p1 = (port.line.p1.x + symbol.bounds.x1, port.line.p1.y + symbol.bounds.y1) 
     p2 = (port.line.p2.x + symbol.bounds.x1, port.line.p2.y + symbol.bounds.y1)
+    pts = {p1, p2}
+    pts.remove(p)
+    p2 = iter(pts).next()
     width = get_type_width(parse_node_name(port.text2.text)) if not primitive else None
-    lines.append((p1, p2, width))
+    lines.append((p, p2, width, port.direction == "input"))
 
   return "".join(statements)
 
@@ -500,7 +502,7 @@ def render_connector(lines, connector, options):
     except pyparsing.ParseException, e:
       if not (name.startswith("<<") and name.endswith(">>")):
         print "WARNING: Couldn't parse \"%s\", ignoring" % name
-  lines.append((p1, p2, width))
+  lines.append((p1, p2, width, False))
   # FIXME: it'd be nice to verify, at the end, that bus matched run width
 
   if connector.label:
