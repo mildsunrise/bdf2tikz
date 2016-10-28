@@ -7,8 +7,9 @@ rs = parse_bdf(open(sys.argv[1],"rb").read())
 
 options = {
   "scale": 1/42.,
+  "port_name_t_snap": 8, "port_name_n_snap": 12, "port_name_n_distance": 4,
   "anchor_ports": True, "anchor_labels": True,
-  "render_pin_bounds": False, "render_symbol_bounds": False,
+  "render_pin_bounds": False, "render_symbol_bounds": True,
 
   "offset": (0,0), "extra_args": [],
 }
