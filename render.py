@@ -498,7 +498,8 @@ def render_connector(lines, connector, options):
     try:
       width = get_type_width(parse_node_name(name))
     except pyparsing.ParseException, e:
-      print "WARNING: Couldn't parse \"%s\", ignoring" % name
+      if not (name.startswith("<<") and name.endswith(">>")):
+        print "WARNING: Couldn't parse \"%s\", ignoring" % name
   lines.append((p1, p2, width))
   # FIXME: it'd be nice to verify, at the end, that bus matched run width
 
