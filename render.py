@@ -406,7 +406,7 @@ def render_symbol(lines, symbol, options):
 
   # Draw bounds
   contents = "%s rectangle %s" % (render_tikz_point((0,0), noptions), render_tikz_point((symbol.bounds.x2 - symbol.bounds.x1, symbol.bounds.y2 - symbol.bounds.y1), noptions))
-  if options["render_symbol_bounds"]:
+  if options["render_primitive_bounds" if primitive else "render_symbol_bounds"]:
     statements += [render_tikz_statement(["symbol bounds"], contents, noptions)]
 
   # Draw symbol type
@@ -415,7 +415,7 @@ def render_symbol(lines, symbol, options):
     statements += [render_text(symbol.typeText, noptions)]
 
   # Drawing itself
-  noptions["extra_args"] = options["extra_args"] + ["symbol"]
+  noptions["extra_args"] = options["extra_args"] + ["primitive" if primitive else "symbol"]
   statements += [render_graphic_object(o, noptions) for o in symbol.drawing if not (hasattr(o, "invisible") and o.invisible)]
 
   # Process ports
