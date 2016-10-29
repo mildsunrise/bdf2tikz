@@ -275,55 +275,66 @@ def render_node_name(name, options):
 def render_all_lines(lines, options):
   # It's important to draw series of connectors "in a single run",
   # rather than many segments, so group them in runs, where each
-  # run is a (point list, width) tuple
+  # run is a { "points": [(x,y), (x,y)...], "width": N, "arrow": bool } dictionary
   runs = []
 
-  def process_end(run):
-    point = run[0][-1]
-    neighbors = []
+  def process_end(run, arrow):
+    run["arrow"][1] = arrow
+    point = run["points"][-1]
+    neighbors = {}
 
     def process(line):
       sides = {line[0], line[1]}
       if point not in sides: return True
 
       sides.remove(point)
-      neighbors.append(iter(sides).next())
-      if line[2] and run[1][0] and line[2] != run[1][0]:
+      neighbors[iter(sides).next()] = line[3]
+      if line[2] and run["width"][0] and line[2] != run["width"][0]:
         print "WARNING: widths inconsistent on point %s" % str(point)
-      if run[1][0] is None:
-        run[1][0] = line[2]
+      if run["width"][0] is None:
+        run["width"][0] = line[2]
       return False
     lines[:] = [line for line in lines if process(line)]
 
-    if len(neighbors) == 1:
-      run[0].append(neighbors[0])
-      return process_end(run)
+    if len(neighbors) == 1 and not run["arrow"][1]:
+      neighbor = neighbors.keys()[0]
+      run["points"].append(neighbor)
+      return process_end(run, neighbors[neighbor])
     for neighbor in neighbors:
-      start_run(point, neighbor, run[1])
+      start_run(point, neighbor, run["width"], neighbors[neighbor])
 
-  def start_run(start, to, width):
-    run = ([start, to], width)
+  def start_run(start, to, width, arrow):
+    run = { "points": [start, to], "width": width, "arrow": [False, False] }
     runs.append(run)
-    process_end(run)
+    process_end(run, arrow)
     return run
 
   while len(lines):
     line = lines.pop()
-    run = start_run(line[0], line[1], [line[2]])
-    run[0].reverse()
-    process_end(run)
+    run = start_run(line[0], line[1], [line[2]], line[3])
+    run["points"].reverse()
+    run["arrow"].reverse()
+    process_end(run, False)
+
+    # for code quality: reverse so that arrow is always -> if possible
+    if run["arrow"] == [True, False]:
+      run["points"].reverse()
+      run["arrow"].reverse()
 
   return "".join(map(lambda x: render_line_run(x,options), runs))
 
 def render_line_run(run, options):
-  points, width = run
-  width = width[0]
+  points = run["points"]
+  width = run["width"][0]
   if width is None:
     print "WARNING: No known type for %s run, defaulting to node" % str(points[0])
     width = 1
   assert len(points) >= 2 and width >= 1
   contents = " -- ".join(map(lambda x: render_tikz_point(x, options), points))
   arguments = [("node" if width == 1 else "bus") + " line"]
+  if run["arrow"] != [False, False]:
+    re = ("<" if run["arrow"][0] else "") + "-" + (">" if run["arrow"][1] else "")
+    arguments.append(re)
   return render_tikz_statement(arguments, contents, options)
 
 # Pin rendering
@@ -433,7 +444,6 @@ def render_symbol(lines, symbol, options):
         noptions["text_anchor"] = calculate_optimal_anchor_to_line(port.text2.bounds, port.text2.vertical, port.line)
       statements += [render_text(port.text2, noptions)]
 
-    # FIXME: draw arrows!
     p = (port.p.x + symbol.bounds.x1, port.p.y + symbol.bounds.y1)
     p1 = (port.line.p1.x + symbol.bounds.x1, port.line.p1.y + symbol.bounds.y1) 
     p2 = (port.line.p2.x + symbol.bounds.x1, port.line.p2.y + symbol.bounds.y1)
@@ -441,7 +451,8 @@ def render_symbol(lines, symbol, options):
     pts.remove(p)
     p2 = iter(pts).next()
     width = get_type_width(parse_node_name(port.text2.text)) if not primitive else None
-    lines.append((p, p2, width, port.direction == "input"))
+    arrow = port.direction == "input" and options["port_input_arrows"] and not primitive
+    lines.append((p, p2, width, arrow))
 
   return "".join(statements)
 

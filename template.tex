@@ -8,6 +8,7 @@
 \usepackage{tikz}
 \usetikzlibrary{circuits.ee.IEC}
 \usetikzlibrary{circuits.logic.US,circuits.logic.IEC}
+\usetikzlibrary{arrows.meta}
 
 \newcommand{\nodenamebit}[1]{\text{#1}}
 \newcommand{\nodenamesingle}[2]{\text{#1}_{#2}}
@@ -22,8 +23,8 @@
   symbol/.style={},
   primitive/.style={symbol},
   symbol type/.style={font=\sffamily\scriptsize, gray},
-  node line/.style={},
-  bus line/.style={ultra thick},
+  node line/.style={>={Latex[length=3pt, width=3pt]}},
+  bus line/.style={>={Latex[length=4pt, width=5pt]}, line width=1.4pt},
   line name/.style={font=\small, inner sep=0pt},
   pin name/.style={font=\small, inner sep=7pt},
   port name/.style={font=\scriptsize, inner sep=0pt},
