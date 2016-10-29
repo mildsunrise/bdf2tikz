@@ -55,8 +55,8 @@ This program needs the `pyparsing` to be available. Install with:
     pip install pyparsing
 
 However, you need a LaTeX distribution installed in order to compile the
-resulting code into a PDF. The code only has dependencies with TikZ and
-its circuits library. (For advanced users: you can avoid the circuits library
+resulting code into a PDF. The code only has dependencies with TikZ and its
+`circuits` libraries. (For advanced users: you can avoid the circuits library
 dependency if you disable native symbols and provide your own `contact` node
 style.)
 
