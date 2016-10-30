@@ -8,7 +8,10 @@ class ParseError(Exception):
   def __init__(self, reason):
     Exception.__init__(self, u"Malformed BDF file: %s" % (reason,))
 
-SUPPORTED_VERSIONS = [u"1.3", u"1.4"]
+SUPPORTED_HEADERS = {
+  u"graphic": [u"1.3", u"1.4"],
+  u"symbol": [u"1.1"],
+}
 
 def parse_bdf(input):
   # Decode in ASCII (FIXME)
@@ -42,11 +45,11 @@ def validate_header(parsed):
   if len(parsed) == 0 or parsed[0][:1] != [u"header"]:
     raise ParseError(u"No header present")
   header = parsed.pop(0)[1:]
-  if len(header) != 2 or header[0] != u"graphic" or header[1][0] != u"version":
+  if len(header) != 2 or header[0] not in SUPPORTED_HEADERS or header[1][0] != u"version":
     raise ParseError(u"Not a BDF file, or unparseable header")
   version_info = header[1]
-  if len(version_info) != 2 or version_info[1] not in SUPPORTED_VERSIONS:
-    raise ParseError(u"Invalid version info: %s" % (header[1],))
+  if len(version_info) != 2 or version_info[1] not in SUPPORTED_HEADERS[header[0]]:
+    raise ParseError(u"Invalid version info: %s %s" % (header[0], version_info[1]))
 
 def interpret_bdf(parsed):
   objects = map(parse_object, parsed)
