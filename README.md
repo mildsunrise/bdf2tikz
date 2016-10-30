@@ -22,6 +22,8 @@ Main features:
  - Scale and other conversion parameters can be tuned via command line options.
  - Support for BDF versions 1.3 and 1.4 (more may be supported but
    have to be checked and added to the whitelist first).
+ - Also supports BSF versions 1.1 (which are actually schematics with
+   only one symbol).
  - Symbols (optional substitution with TikZ native logic gates).
  - Node / bus connectors, with / without label, and junctions.
  - Input / output pins with label (with manual drawing).
@@ -50,7 +52,7 @@ Unsupported features:
 
 ## Install
 
-This program needs the `pyparsing` to be available. Install with:
+This program needs the `pyparsing` module to be available. Install with:
 
     pip install pyparsing
 
@@ -62,4 +64,7 @@ style.)
 
 ## Usage
 
+    python main.py <BDF file> out.tex
 
+Note that `main.py` can also be used as a module for programmatic rendering.
+(Option parsing is still pending.)
