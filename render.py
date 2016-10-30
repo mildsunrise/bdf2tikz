@@ -525,7 +525,8 @@ def render_connector(lines, connector, options):
     try:
       return render_text(connector.label, noptions)
     except pyparsing.ParseException, e:
-      print "WARNING: Couldn't parse \"%s\", ignoring" % name
+      if not (name.startswith("<<") and name.endswith(">>")):
+        print "WARNING: Couldn't parse \"%s\", ignoring" % name
 
 def render_junction(junction, options):
   p = (junction.p.x, junction.p.y)
