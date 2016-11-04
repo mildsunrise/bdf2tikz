@@ -62,6 +62,9 @@ resulting code into a PDF. The code only has dependencies with TikZ and its
 dependency if you disable native symbols and provide your own `contact` node
 style.)
 
+The template also depends on the `amsmath` package and the `arrows.meta`
+TikZ library.
+
 ## Usage
 
     python main.py <BDF file> out.tex
