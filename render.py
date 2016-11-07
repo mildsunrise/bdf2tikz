@@ -289,10 +289,7 @@ def render_all_lines(lines, options):
 
       sides.remove(point)
       neighbors[iter(sides).next()] = line[3]
-      if line[2] and run["width"][0] and line[2] != run["width"][0]:
-        print "WARNING: widths inconsistent on point %s" % str(point)
-      if run["width"][0] is None:
-        run["width"][0] = line[2]
+      join_widths(point, run["width"], line[2])
       return False
     lines[:] = [line for line in lines if process(line)]
 
@@ -308,6 +305,11 @@ def render_all_lines(lines, options):
     runs.append(run)
     process_end(run, arrow)
     return run
+
+  def join_widths(point, w1, w2):
+    if w1[0] and w2 and w1[0] != w2:
+      print "WARNING: widths inconsistent on point %s: %d vs %d" % (str(point), w1[0], w2)
+    if w1[0] is None or w1[0] < w2: w1[0] = w2
 
   while len(lines):
     line = lines.pop()
