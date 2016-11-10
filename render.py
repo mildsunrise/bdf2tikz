@@ -12,6 +12,7 @@ class RenderError(Exception):
 #     extra_args: list of strings, extra TikZ options to use in statements
 #     anchor_ports: whether port names should be anchored optimally
 #     anchor_labels: whether connector labels should be anchored optimally
+#     FIXME: document others
 
 # VERY LOW LEVEL
 # TikZ syntax for coordinates, points...
@@ -270,7 +271,7 @@ def render_node_name(name, options):
     return "\\nodenamebit{%s}" % (render_tikz_text(name, options))
   return "$%s$" % " ".join(map(render_component, parse_node_name(name)))
 
-# Line rendering (lines is a list of (p1, p2, width, arrow))
+# Line rendering (lines is a list of (p1, p2, width, is_input, no_output, has_output))
 
 def join_widths(point, w1, w2):
   if w1 and w2 and w1 != w2:
@@ -281,10 +282,10 @@ def join_widths(point, w1, w2):
 def render_all_lines(lines, options):
   # It's important to draw series of connectors "in a single run",
   # rather than many segments, so group them in runs, where each
-  # run is a { "points": [(x,y), (x,y)...], "width": N, "arrow": bool } dictionary
+  # run is a { "points": [(x,y), (x,y)...], "width": [N], "arrow": [bool, bool], "has_output": [bool], "output_forbidden": [bool, bool] } dictionary
   runs = []
 
-  def process_end(run, arrow):
+  def process_end(run, arrow, output_forbidden):
     run["arrow"][1] = arrow
     point = run["points"][-1]
     neighbors = {}
@@ -294,35 +295,40 @@ def render_all_lines(lines, options):
       if point not in sides: return True
 
       sides.remove(point)
-      neighbors[iter(sides).next()] = line[3]
+      neighbors[iter(sides).next()] = (line[3], line[4])
       run["width"][0] = join_widths(point, run["width"][0], line[2])
+      run["has_output"][0] = run["has_output"][0] or line[5]
       return False
     lines[:] = [line for line in lines if process(line)]
 
     if len(neighbors) == 1 and not run["arrow"][1]:
       neighbor = neighbors.keys()[0]
       run["points"].append(neighbor)
-      return process_end(run, neighbors[neighbor])
+      return process_end(run, neighbors[neighbor][0], neighbors[neighbor][1])
+    run["output_forbidden"][1] = output_forbidden or (len(neighbors) > 0)
     for neighbor in neighbors:
-      start_run(point, neighbor, run["width"], neighbors[neighbor])
+      new_run = start_run(point, neighbor, run["width"], neighbors[neighbor][0], neighbors[neighbor][1], run["has_output"])
+      new_run["output_forbidden"][0] = True
 
-  def start_run(start, to, width, arrow):
-    run = { "points": [start, to], "width": width, "arrow": [False, False] }
+  def start_run(start, to, width, arrow, output_forbidden, has_output):
+    run = { "points": [start, to], "width": width, "arrow": [False, False], "has_output": has_output, "output_forbidden": [False, False] }
     runs.append(run)
-    process_end(run, arrow)
+    process_end(run, arrow, output_forbidden)
     return run
 
   while len(lines):
     line = lines.pop()
-    run = start_run(line[0], line[1], [line[2]], line[3])
+    run = start_run(line[0], line[1], [line[2]], line[3], line[4], [line[5]])
     run["points"].reverse()
     run["arrow"].reverse()
-    process_end(run, False)
+    run["output_forbidden"].reverse()
+    process_end(run, False, False)
 
     # for code quality: reverse so that arrow is always -> if possible
     if run["arrow"] == [True, False]:
       run["points"].reverse()
       run["arrow"].reverse()
+      run["output_forbidden"].reverse()
 
   return "".join(map(lambda x: render_line_run(x,options), runs))
 
@@ -335,8 +341,11 @@ def render_line_run(run, options):
   assert len(points) >= 2 and width >= 1
   contents = " -- ".join(map(lambda x: render_tikz_point(x, options), points))
   arguments = [("node" if width == 1 else "bus") + " line"]
-  if run["arrow"] != [False, False]:
-    re = ("<" if run["arrow"][0] else "") + "-" + (">" if run["arrow"][1] else "")
+  arrow = run["arrow"]
+  if run["has_output"][0] and options["connector_output_arrows"]:
+    arrow = [a or (not o) for a, o in zip(run["arrow"], run["output_forbidden"])]
+  if arrow != [False, False]:
+    re = ("<" if arrow[0] else "") + "-" + (">" if arrow[1] else "")
     arguments.append(re)
   return render_tikz_statement(arguments, contents, options)
 
@@ -378,7 +387,7 @@ def render_pin(lines, pin, options):
   connection = (connection[0] + pin.bounds.x1, connection[1] + pin.bounds.y1)
   entry = (pin.p.x + pin.bounds.x1, pin.p.y + pin.bounds.y1)
   width = get_type_width(parse_node_name(name))
-  lines.append((connection, entry, width, False))
+  lines.append((entry, connection, width, False, True, pin.direction == "input"))
 
   # Pin drawing itself
   contents = " -- ".join(map(lambda x: render_tikz_point(x, noptions), drawing) + ["cycle"])
@@ -455,7 +464,7 @@ def render_symbol(lines, symbol, options):
     p2 = iter(pts).next()
     width = get_type_width(parse_node_name(port.text2.text)) if not primitive else None
     arrow = port.direction == "input" and options["port_input_arrows"] and not primitive
-    lines.append((p, p2, width, arrow))
+    lines.append((p, p2, width, arrow, True, port.direction == "output"))
 
   return "".join(statements)
 
@@ -516,7 +525,7 @@ def render_connector(lines, connector, options):
     except pyparsing.ParseException, e:
       if not (name.startswith("<<") and name.endswith(">>")):
         print "WARNING: Couldn't parse \"%s\", ignoring" % name
-  lines.append((p1, p2, width, False))
+  lines.append((p1, p2, width, False, False, False))
   # FIXME: it'd be nice to verify, at the end, that bus matched run width
 
   if connector.label:

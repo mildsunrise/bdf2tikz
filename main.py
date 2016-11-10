@@ -11,7 +11,7 @@ default_options = {
   "anchor_ports": True, "anchor_labels": True,
   "render_pin_bounds": False,
   "render_symbol_bounds": True, "render_primitive_bounds": False,
-  "port_input_arrows": True,
+  "port_input_arrows": True, "connector_output_arrows": True,
 
   "offset": (0,0), "extra_args": [],
 }

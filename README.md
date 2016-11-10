@@ -34,6 +34,7 @@ Main features:
    providing correct typesetting.
  - Optionally, each run can be "tagged" with its width.
  - Port lines can have optional arrows if they are inputs.
+ - Connectors can have optional arrows indicating output value.
  - Optional bounds rendering for pins and / or symbols.
  - Anchors can be intelligently selected for line labels and port names.
  - Text comments supported.
