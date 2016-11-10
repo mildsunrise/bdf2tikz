@@ -463,7 +463,8 @@ def render_symbol(lines, symbol, options):
     pts.remove(p)
     p2 = iter(pts).next()
     width = get_type_width(parse_node_name(port.text2.text)) if not primitive else None
-    arrow = port.direction == "input" and options["port_input_arrows"] and not primitive
+    can_have_arrow = options["port_arrows_if_invisible"] or not port.text2.invisible
+    arrow = port.direction == "input" and options["port_input_arrows"] and can_have_arrow
     lines.append((p, p2, width, arrow, True, port.direction == "output"))
 
   return "".join(statements)
