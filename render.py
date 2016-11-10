@@ -272,6 +272,12 @@ def render_node_name(name, options):
 
 # Line rendering (lines is a list of (p1, p2, width, arrow))
 
+def join_widths(point, w1, w2):
+  if w1 and w2 and w1 != w2:
+    print "WARNING: widths inconsistent on point %s: %d vs %d" % (str(point), w1, w2)
+  if w1 is None or w1 < w2: w1 = w2
+  return w1
+
 def render_all_lines(lines, options):
   # It's important to draw series of connectors "in a single run",
   # rather than many segments, so group them in runs, where each
@@ -289,7 +295,7 @@ def render_all_lines(lines, options):
 
       sides.remove(point)
       neighbors[iter(sides).next()] = line[3]
-      join_widths(point, run["width"], line[2])
+      run["width"][0] = join_widths(point, run["width"][0], line[2])
       return False
     lines[:] = [line for line in lines if process(line)]
 
@@ -305,11 +311,6 @@ def render_all_lines(lines, options):
     runs.append(run)
     process_end(run, arrow)
     return run
-
-  def join_widths(point, w1, w2):
-    if w1[0] and w2 and w1[0] != w2:
-      print "WARNING: widths inconsistent on point %s: %d vs %d" % (str(point), w1[0], w2)
-    if w1[0] is None or w1[0] < w2: w1[0] = w2
 
   while len(lines):
     line = lines.pop()
