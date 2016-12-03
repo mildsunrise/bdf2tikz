@@ -16,7 +16,7 @@
 # along with bdf2tikz.  If not, see <http://www.gnu.org/licenses/>.
 
 from pyparsing import ZeroOrMore
-from utils.sexp import sexp
+from .utils.sexp import sexp
 import traceback
 import re
 import pprint

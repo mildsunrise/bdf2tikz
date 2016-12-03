@@ -17,7 +17,7 @@
 
 import math
 import pyparsing
-import parser
+from . import parser
 
 class RenderError(Exception):
   pass
