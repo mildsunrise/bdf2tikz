@@ -34,32 +34,32 @@ default_options = {
 }
 
 def render_bdf(rs, options):
-	rs = parse_bdf(rs)
-	lines = []
-	output = ""
-	complementary_output = ""
+  rs = parse_bdf(rs)
+  lines = []
+  output = ""
+  complementary_output = ""
 
-	for thing in rs:
-		if isinstance(thing, parser.Pin):
-		  output += render.render_tikz_comment("Pin (%s) named %s" % (thing.typeText.text, thing.name.text), options)
-		  output += render.render_pin(lines, thing, options) + "\n"
-		elif isinstance(thing, parser.Symbol):
-		  output += render.render_tikz_comment("Symbol (%s) named %s" % (thing.typeText.text, thing.name.text), options)
-		  output += render.render_symbol(lines, thing, options) + "\n"
-		elif isinstance(thing, parser.Text):
-		  output += render.render_text(thing, options) + "\n"
-		elif isinstance(thing, parser.Junction):
-		  complementary_output += render.render_junction(thing, options)
-		elif isinstance(thing, parser.Connector):
-		  tmp = render.render_connector(lines, thing, options)
-		  if tmp: complementary_output += tmp
-		else:
-		  print "WARNING: couldn't process object of type %s in schematic" % (type(thing),)
+  for thing in rs:
+    if isinstance(thing, parser.Pin):
+      output += render.render_tikz_comment("Pin (%s) named %s" % (thing.typeText.text, thing.name.text), options)
+      output += render.render_pin(lines, thing, options) + "\n"
+    elif isinstance(thing, parser.Symbol):
+      output += render.render_tikz_comment("Symbol (%s) named %s" % (thing.typeText.text, thing.name.text), options)
+      output += render.render_symbol(lines, thing, options) + "\n"
+    elif isinstance(thing, parser.Text):
+      output += render.render_text(thing, options) + "\n"
+    elif isinstance(thing, parser.Junction):
+      complementary_output += render.render_junction(thing, options)
+    elif isinstance(thing, parser.Connector):
+      tmp = render.render_connector(lines, thing, options)
+      if tmp: complementary_output += tmp
+    else:
+      print("WARNING: couldn't process object of type %s in schematic" % (type(thing),))
 
-	output += render.render_all_lines(lines, options)
-	output += complementary_output
+  output += render.render_all_lines(lines, options)
+  output += complementary_output
 
-	return output
+  return output
 
 
 

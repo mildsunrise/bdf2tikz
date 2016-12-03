@@ -30,12 +30,16 @@ SUPPORTED_HEADERS = {
   u"symbol": [u"1.1"],
 }
 
+# hack for compatibility with python 2.7, sorta
+try: str = unicode
+except: pass
+
 def parse_bdf(input):
   # Decode in ASCII (FIXME)
   try:
     input = input.decode("ascii")
-  except UnicodeDecodeError, e:
-    raise ParseError(u"Non-ASCII content")
+  except UnicodeDecodeError as e:
+    raise ParseError("Non-ASCII content")
 
   # Remove starting comments, if present
   while True:
@@ -69,14 +73,16 @@ def validate_header(parsed):
     raise ParseError(u"Invalid version info: %s %s" % (header[0], version_info[1]))
 
 def interpret_bdf(parsed):
-  objects = map(parse_object, parsed)
+  objects = list(map(parse_object, parsed))
   for i in objects: assert isinstance(i, SchematicObject)
   return objects
 
 # Internal objects
 # (don't appear on the parsed result, will be replaced by its carrying attribute)
 
-class FontSize:
+class ParseObject(object): pass
+
+class FontSize(ParseObject):
   name = u"font_size"
   def __init__(self, size):
     self.size = size
@@ -87,7 +93,7 @@ class FontSize:
     assert len(object) == 0
     return FontSize(size)
 
-class LineWidth:
+class LineWidth(ParseObject):
   name = u"line_width"
   def __init__(self, width):
     self.width = width
@@ -98,17 +104,17 @@ class LineWidth:
     assert len(object) == 0
     return LineWidth(width)
 
-class Drawing:
+class Drawing(ParseObject):
   name = u"drawing"
   def __init__(self, objects):
     self.objects = objects
   @staticmethod
   def parse(object):
-    objects = map(parse_object, object)
+    objects = list(map(parse_object, object))
     for o in objects: assert isinstance(o, GraphicObject)
     return Drawing(objects)
 
-class AnnotationBlock:
+class AnnotationBlock(ParseObject):
   name = u"annotation_block"
   @staticmethod
   def parse(object):
@@ -116,7 +122,7 @@ class AnnotationBlock:
 
 # Basic objects
 
-class Font:
+class Font(ParseObject):
   name = u"font"
   def __init__(self, font, font_size, bold):
     self.font = font
@@ -132,7 +138,7 @@ class Font:
   @staticmethod
   def parse(object):
     font = object.pop(0)
-    assert isinstance(font, unicode)
+    assert isinstance(font, str)
     font_size = None
     bold = None
     for o in object:
@@ -146,7 +152,7 @@ class Font:
       else: raise ParseError("Invalid object %s found in font" % o)
     return Font(font, font_size, bold)
 
-class Bounds:
+class Bounds(ParseObject):
   name = u"rect"
   def __init__(self, x1, y1, x2, y2):
     self.x1, self.y1 = x1, y1
@@ -159,7 +165,7 @@ class Bounds:
     for i in object: assert isinstance(i, int)
     return Bounds(*object)
 
-class Point:
+class Point(ParseObject):
   name = u"pt"
   def __init__(self, x, y):
     self.x, self.y = x, y
@@ -176,7 +182,7 @@ class Point:
 
 DIRECTIONS = [u"output", u"input", u"bidir"] # FIXME: verify bidir
 
-class Port:
+class Port(ParseObject):
   name = u"port"
   def __init__(self, p, direction, text1, text2, line):
     self.p = p
@@ -189,7 +195,7 @@ class Port:
   @staticmethod
   def parse(object):
     assert len(object) == 5
-    object = map(parse_object, object)
+    object = list(map(parse_object, object))
     assert isinstance(object[0], Point)
     assert object[1] in DIRECTIONS
     assert isinstance(object[2], Text) and isinstance(object[3], Text)
@@ -199,7 +205,7 @@ class Port:
 # Schematic objects
 # (anything that can appear on the top level)
 
-class SchematicObject(object):
+class SchematicObject(ParseObject):
   def __repr__(self):
     return "\n" + type(self).__name__ +" {\n  %s\n}" % pprint.pformat(vars(self), indent=2)[2:-1]
 
@@ -210,7 +216,7 @@ class Junction(SchematicObject):
   @staticmethod
   def parse(object):
     assert len(object) == 1
-    object = map(parse_object, object)
+    object = list(map(parse_object, object))
     assert isinstance(object[0], Point)
     return Junction(*object)
 
@@ -225,11 +231,11 @@ class Connector(SchematicObject):
     object = parse_grouped(object, {
       Point: (2,2),
       Text: (0,1),
-      unicode: (0,1),
+      str: (0,1),
     })
     bus = None
     label = None
-    if u"bus" in object[unicode]: bus = True
+    if u"bus" in object[str]: bus = True
     if len(object[Text]): label = object[Text][0]
     return Connector(object[Point][0], object[Point][1], label, bus)
 
@@ -250,10 +256,10 @@ class Symbol(SchematicObject):
       Bounds: (1,1),
       Port: (0,),
       Drawing: (1,1),
-      unicode: (0,),
+      str: (0,),
     })
     mirror, rotation = None, None
-    for flag in o[unicode]:
+    for flag in o[str]:
       sflag = re.match("^(flip([xy])_)?rotate(90|180|270)$", flag) or re.match("^(flip([xy]))$", flag)
       if sflag:
         mirror = sflag.group(2)
@@ -281,11 +287,11 @@ class Pin(SchematicObject):
       Point: (1,1),
       Drawing: (1,1),
       AnnotationBlock: (0,),
-      unicode: (0,),
+      str: (0,),
     })
     level = o[Text][2] if len(o[Text]) > 2 else None
     direction, mirror, rotation = None, None, None
-    for flag in o[unicode]:
+    for flag in o[str]:
       sflag = re.match("^(flip([xy])_)?rotate(90|180|270)$", flag) or re.match("^(flip([xy]))$", flag)
       if sflag: # FIXME: check duplicity
         mirror = sflag.group(2)
@@ -310,14 +316,14 @@ class Text(GraphicObject):
   @staticmethod
   def parse(object):
     text = object.pop(0)
-    assert isinstance(text, unicode)
+    assert isinstance(text, str)
     o = parse_grouped(object, {
       Bounds: (1,1),
       Font: (1,1),
-      unicode: (0,),
+      str: (0,),
     })
     vertical, invisible = None, None
-    for flag in o[unicode]:
+    for flag in o[str]:
       if flag == u"vertical":
         assert vertical is None
         vertical = True
@@ -335,7 +341,7 @@ class Line(GraphicObject):
   @staticmethod
   def parse(object): # FIXME: migrate
     assert len(object) == 3
-    object = map(parse_object, object)
+    object = list(map(parse_object, object))
     assert isinstance(object[0], Point)
     assert isinstance(object[1], Point)
     assert isinstance(object[2], LineWidth)
@@ -394,7 +400,7 @@ class Circle(GraphicObject):
 all_types = {}
 
 def parse_object(object):
-  if (not isinstance(object, list)) or len(object) < 1 or (not isinstance(object[0], unicode)):
+  if (not isinstance(object, list)) or len(object) < 1 or (not isinstance(object[0], str)):
     raise ParseError(u"Not an object: %s" % repr(object))
   name = object.pop(0)
   if name not in all_types:
@@ -404,7 +410,7 @@ def parse_object(object):
     result = all_types[name].parse(object)
     assert isinstance(result, all_types[name])
     return result
-  except Exception, e:
+  except Exception as e:
     if isinstance(e, ParseError): raise
     raise ParseError(u"Couldn't parse %s %s:\n%s" % (name, repr(object), traceback.format_exc(e)))
 
@@ -431,7 +437,6 @@ def parse_grouped(object, types):
   return result
 
 # Make them inherit from base class to tag them, don't rely in name present
-import types
-for thing in globals().values():
-  if (isinstance(thing, type) or isinstance(thing, types.ClassType)) and hasattr(thing, u"name"):
+for thing in list(globals().values()):
+  if (type(thing) is type) and issubclass(thing, ParseObject) and hasattr(thing, "name"):
     all_types[thing.name] = thing

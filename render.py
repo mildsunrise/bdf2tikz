@@ -238,7 +238,7 @@ def transform_text_anchor(object, anchor):
 
 def get_object_transform_matrix(object):
   matrix = ROTATION_MATRIXES[object.rotation or 0]
-  matrix = map(list, matrix) # deep copy
+  matrix = list(map(list, matrix)) # deep copy
   if object.mirror == "x":
     matrix[0][1] *= -1
     matrix[1][1] *= -1
@@ -292,7 +292,7 @@ def render_node_name(name, options):
 
 def join_widths(point, w1, w2):
   if w1 and w2 and w1 != w2:
-    print "WARNING: widths inconsistent on point %s: %d vs %d" % (str(point), w1, w2)
+    print("WARNING: widths inconsistent on point %s: %d vs %d" % (str(point), w1, w2))
   if w1 is None or w1 < w2: w1 = w2
   return w1
 
@@ -312,7 +312,7 @@ def render_all_lines(lines, options):
       if point not in sides: return True
 
       sides.remove(point)
-      neighbors[iter(sides).next()] = (line[3], line[4])
+      neighbors[next(iter(sides))] = (line[3], line[4])
       run["width"][0] = join_widths(point, run["width"][0], line[2])
       run["has_output"][0] = run["has_output"][0] or line[5]
       return False
@@ -353,7 +353,7 @@ def render_line_run(run, options):
   points = run["points"]
   width = run["width"][0]
   if width is None:
-    print "WARNING: No known type for %s run, defaulting to node" % str(points[0])
+    print("WARNING: No known type for %s run, defaulting to node" % str(points[0]))
     width = 1
   assert len(points) >= 2 and width >= 1
   contents = " -- ".join(map(lambda x: render_tikz_point(x, options), points))
@@ -381,7 +381,7 @@ def render_pin(lines, pin, options):
     text_anchor = "east"
     drawing = [(92,12), (117,12), (121,8), (117,4), (92,4)]
   else:
-    print "WARNING: don't know how to render %s pin drawing" % pin.direction
+    print("WARNING: don't know how to render %s pin drawing" % pin.direction)
     return None
 
   noptions = dict(options)
@@ -392,7 +392,7 @@ def render_pin(lines, pin, options):
   transform = get_point_transform(pin)
   connection = transform(connection)
   text_point = transform(text_point)
-  drawing = map(transform, drawing)
+  drawing = list(map(transform, drawing))
   text_anchor = transform_text_anchor(pin, text_anchor)
 
   # Draw bounds
@@ -461,7 +461,7 @@ def render_symbol(lines, symbol, options):
   # Process ports
   for port in symbol.ports:
     if port.text1.text != port.text2.text:
-      print "WARNING: port on symbol %s has different texts: \"%s\" and \"%s\". picking the last one" % (symbol.name.text, port.text1.text, port.text2.text)
+      print("WARNING: port on symbol %s has different texts: \"%s\" and \"%s\". picking the last one" % (symbol.name.text, port.text1.text, port.text2.text))
     
     if not port.text2.invisible:
       noptions["extra_args"] = options["extra_args"] + ["port name"]
@@ -478,7 +478,7 @@ def render_symbol(lines, symbol, options):
     p2 = (port.line.p2.x + symbol.bounds.x1, port.line.p2.y + symbol.bounds.y1)
     pts = {p1, p2}
     pts.remove(p)
-    p2 = iter(pts).next()
+    p2 = next(iter(pts))
     width = get_type_width(parse_node_name(port.text2.text)) if not primitive else None
     can_have_arrow = options["port_arrows_if_invisible"] or not port.text2.invisible
     arrow = port.direction == "input" and options["port_input_arrows"] and can_have_arrow
@@ -495,7 +495,7 @@ def snap_port_name(port, options):
   # determine inner point
   line_points = { (port.line.p1.x, port.line.p1.y), (port.line.p2.x, port.line.p2.y) }
   line_points.remove((port.p.x, port.p.y))
-  point = iter(line_points).next()
+  point = next(iter(line_points))
 
   # line should be horizontal or vertical
   line_delta = (port.p.x - point[0], port.p.y - point[1])
@@ -540,9 +540,9 @@ def render_connector(lines, connector, options):
     name = connector.label.text
     try:
       width = get_type_width(parse_node_name(name))
-    except pyparsing.ParseException, e:
+    except pyparsing.ParseException as e:
       if not (name.startswith("<<") and name.endswith(">>")):
-        print "WARNING: Couldn't parse \"%s\", ignoring" % name
+        print("WARNING: Couldn't parse \"%s\", ignoring" % name)
   lines.append((p1, p2, width, False, False, False))
   # FIXME: it'd be nice to verify, at the end, that bus matched run width
 
@@ -554,9 +554,9 @@ def render_connector(lines, connector, options):
       noptions["text_anchor"] = calculate_optimal_anchor_to_line(connector.label.bounds, connector.label.vertical, parser.Line(connector.p1, connector.p2, None))
     try:
       return render_text(connector.label, noptions)
-    except pyparsing.ParseException, e:
+    except pyparsing.ParseException as e:
       if not (name.startswith("<<") and name.endswith(">>")):
-        print "WARNING: Couldn't parse \"%s\", ignoring" % name
+        print("WARNING: Couldn't parse \"%s\", ignoring" % name)
 
 def render_junction(junction, options):
   p = (junction.p.x, junction.p.y)
