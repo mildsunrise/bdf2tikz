@@ -350,6 +350,7 @@ def render_all_lines(lines, options):
   return "".join(map(lambda x: render_line_run(x,options), runs))
 
 def render_line_run(run, options):
+  # FIXME: remove unnecessary intermediary points (if feature enabled) and use |- syntax
   points = run["points"]
   width = run["width"][0]
   if width is None:
