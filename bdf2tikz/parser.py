@@ -30,10 +30,6 @@ SUPPORTED_HEADERS = {
   u"symbol": [u"1.1"],
 }
 
-# hack for compatibility with python 2.7, sorta
-try: str = unicode
-except: pass
-
 def parse_bdf(input):
   # Decode in ASCII (FIXME)
   try:
